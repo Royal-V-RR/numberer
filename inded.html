@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>File Numberer</title>
+<style>
+:root{--bg:#f6f4fb;--card:#fff;--ink:#1d1a26;--mute:#6b6678;--acc:#7a4dff;--line:#ddd8ea;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14121b;--card:#1e1b29;--ink:#f1eef9;--mute:#9b96ad;--acc:#9c7bff;--line:#322e42}}
+:root[data-theme="dark"]{--bg:#14121b;--card:#1e1b29;--ink:#f1eef9;--mute:#9b96ad;--acc:#9c7bff;--line:#322e42}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.4}
+main{max-width:960px;margin:0 auto;padding:18px 14px 40px}
+h1{margin:0 0 4px;font-size:1.6rem}
+p.sub{margin:0 0 16px;color:var(--mute)}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;display:grid;gap:14px}
+.row{display:grid;gap:8px}
+label.t{font-weight:600;font-size:.9rem}
+button,.btn{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:10px 14px;cursor:pointer;text-align:center}
+button.primary,.btn.primary{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}
+button[aria-pressed="true"]{background:var(--acc);border-color:var(--acc);color:#fff}
+.corners{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+input[type=range]{width:100%;accent-color:var(--acc)}
+input[type=file]{display:none}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.actions>*{flex:1 1 140px}
+.count{color:var(--mute);font-size:.9rem}
+.grid{margin-top:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.item{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px;display:grid;gap:8px}
+.item canvas{width:100%;height:auto;border-radius:8px;display:block}
+.item .name{font-size:.8rem;color:var(--mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.empty{margin-top:16px;text-align:center;color:var(--mute);padding:30px 10px;border:2px dashed var(--line);border-radius:14px}
+</style>
+</head>
+<body>
+<main>
+<h1>File Numberer</h1>
+<p class="sub">Add images and each one gets a numbered label. Numbers follow the order you add them.</p>
+<div class="panel">
+<div class="actions">
+<label class="btn primary" for="file">Add images</label>
+<input id="file" type="file" accept="image/*" multiple>
+<button id="clear" type="button">Clear all</button>
+</div>
+<div class="row">
+<label class="t">Label position</label>
+<div class="corners" id="corners">
+<button type="button" data-c="tl" aria-pressed="false">Top left</button>
+<button type="button" data-c="tr" aria-pressed="true">Top right</button>
+<button type="button" data-c="bl" aria-pressed="false">Bottom left</button>
+<button type="button" data-c="br" aria-pressed="false">Bottom right</button>
+</div>
+</div>
+<div class="row">
+<label class="t" for="size">Label size <span id="sizeVal">8</span>%</label>
+<input id="size" type="range" min="2" max="30" value="8">
+</div>
+<div class="actions">
+<button id="all" type="button" class="primary">Download all</button>
+<span class="count" id="count">No images yet</span>
+</div>
+</div>
+<div id="empty" class="empty">Tap Add images to begin</div>
+<div class="grid" id="grid"></div>
+</main>
+<script>
+const state={items:[],corner:"tr",pct:8};
+const grid=document.getElementById("grid");
+const empty=document.getElementById("empty");
+const count=document.getElementById("count");
+const sizeEl=document.getElementById("size");
+const sizeVal=document.getElementById("sizeVal");
+
+function draw(item,n){
+const c=item.canvas,img=item.img;
+const w=img.naturalWidth,h=img.naturalHeight;
+c.width=w;c.height=h;
+const x=c.getContext("2d");
+x.drawImage(img,0,0);
+const fs=Math.max(8,Math.round(Math.min(w,h)*state.pct/100));
+x.font="700 "+fs+"px system-ui,sans-serif";
+const t=String(n);
+const p=fs*0.35;
+const bw=x.measureText(t).width+p*2;
+const bh=fs+p*2;
+const m=fs*0.5;
+const bx=state.corner.includes("l")?m:w-bw-m;
+const by=state.corner.includes("t")?m:h-bh-m;
+x.beginPath();
+x.roundRect(bx,by,bw,bh,fs*0.25);
+x.fillStyle="rgba(0,0,0,0.78)";
+x.fill();
+x.fillStyle="#fff";
+x.textAlign="center";
+x.textBaseline="middle";
+x.fillText(t,bx+bw/2,by+bh/2+fs*0.04);
+}
+
+function redrawAll(){
+state.items.forEach((it,i)=>draw(it,i+1));
+}
+
+function save(item,n){
+item.canvas.toBlob(b=>{
+const a=document.createElement("a");
+const base=item.name.replace(/\.[^.]+$/,"");
+a.href=URL.createObjectURL(b);
+a.download=String(n).padStart(3,"0")+"_"+base+".png";
+document.body.appendChild(a);
+a.click();
+a.remove();
+setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+},"image/png");
+}
+
+function refresh(){
+const n=state.items.length;
+empty.style.display=n?"none":"block";
+count.textContent=n?n+(n===1?" image":" images"):"No images yet";
+}
+
+function load(file){
+return new Promise(res=>{
+const img=new Image();
+img.onload=()=>res({img,name:file.name});
+//What the fuck is wrong
+img.onerror=()=>res(null);
+img.src=URL.createObjectURL(file);
+});
+}
+
+function addCard(item){
+const n=state.items.length;
+const card=document.createElement("div");
+card.className="item";
+item.canvas=document.createElement("canvas");
+const nm=document.createElement("div");
+nm.className="name";
+nm.textContent=item.name;
+const b=document.createElement("button");
+b.type="button";
+b.textContent="Save this one";
+b.addEventListener("click",()=>save(item,state.items.indexOf(item)+1));
+card.append(item.canvas,nm,b);
+grid.appendChild(card);
+draw(item,n);
+}
+
+document.getElementById("file").addEventListener("change",async e=>{
+const files=[...e.target.files];
+e.target.value="";
+const loaded=await Promise.all(files.map(load));
+loaded.filter(Boolean).forEach(it=>{
+state.items.push(it);
+addCard(it);
+});
+refresh();
+});
+
+document.getElementById("clear").addEventListener("click",()=>{
+state.items=[];
+grid.innerHTML="";
+refresh();
+});
+
+document.getElementById("corners").addEventListener("click",e=>{
+const b=e.target.closest("button");
+if(!b)return;
+state.corner=b.dataset.c;
+document.querySelectorAll("#corners button").forEach(x=>x.setAttribute("aria-pressed",x===b?"true":"false"));
+redrawAll();
+});
+
+sizeEl.addEventListener("input",()=>{
+state.pct=Number(sizeEl.value);
+sizeVal.textContent=state.pct;
+redrawAll();
+});
+
+document.getElementById("all").addEventListener("click",()=>{
+state.items.forEach((it,i)=>setTimeout(()=>save(it,i+1),i*350));
+});
+
+refresh();
+</script>
+</body>
+</html>
